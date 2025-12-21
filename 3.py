@@ -30,7 +30,7 @@ def fetch_url_text(url):
         soup = BeautifulSoup(resp.text, 'html.parser')
         p_text = "\n".join([p.get_text(strip=True) for p in soup.find_all("p") if len(p.get_text(strip=True))>10])
         art_text = soup.find("article").get_text(strip=True) if soup.find("article") else ""
-        text = p_text if len(p.get_text(strip=True)) > len(art_text) else art_text
+        text = p_text if len(p_text) > len(art_text) else art_text
         return re.sub(r'[^\u4e00-\u9fa5\s]', '', re.sub(r'\s+', ' ', text))
     except Exception as e:
         return f"URL抓取失败：{str(e)}"
@@ -120,4 +120,5 @@ if analyze_btn:
 
 # 页脚
 st.divider()
+
 st.caption("💡 部署于Streamlit Cloud | 支持32位系统兼容")
