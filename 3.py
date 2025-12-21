@@ -3,6 +3,8 @@
 import streamlit as st
 import jieba
 import re
+import tempfile
+import os
 from collections import Counter
 import pyecharts.options as opts
 from pyecharts.charts import WordCloud, Bar, Line, Pie, Radar, Scatter, HeatMap, Funnel
@@ -43,6 +45,7 @@ def analyze_text(text, min_freq=1):
     return {k:v for k,v in word_freq.items() if v>=min_freq}, sorted(word_freq.items(), key=lambda x:x[1], reverse=True)[:20]
 
 # 3. 生成图表
+
 def generate_chart_html(top20, chart_type):
     if not top20:
         return "<div style='text-align:center;padding:50px;color:#666;'>暂无有效数据</div>"
@@ -50,7 +53,7 @@ def generate_chart_html(top20, chart_type):
     words, freqs = [i[0] for i in top20], [i[1] for i in top20]
     max_freq = max(freqs) if freqs else 1
 
-    # 生成图表（改用render_notebook，适配Streamlit）
+    # 生成图表
     if chart_type == "词云图":
         c = WordCloud(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
         c.add("词频", top20, word_size_range=[20, 80])
@@ -90,8 +93,13 @@ def generate_chart_html(top20, chart_type):
         c.add("词频", top20)
         c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇漏斗图"))
 
-    # 生成适合Streamlit的HTML（关键修复）
-    return c.render_notebook()
+    # 临时生成HTML文件并读取内容（关键修复）
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False, encoding="utf-8") as f:
+        c.render(f.name)
+        with open(f.name, "r", encoding="utf-8") as f_read:
+            html_content = f_read.read()
+    os.unlink(f.name)  # 删除临时文件
+    return html_content
 # ======== Streamlit页面布局 ========
 st.title("📊 URL文本词频分析系统")
 st.subheader("Streamlit Cloud部署版 | 支持8种图表可视化")
@@ -147,5 +155,6 @@ if analyze_btn:
 st.divider()
 
 st.caption("💡 部署于Streamlit Cloud | 支持32位系统兼容")
+
 
 
