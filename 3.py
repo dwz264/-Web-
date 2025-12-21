@@ -44,29 +44,54 @@ def analyze_text(text, min_freq=1):
 
 # 3. 生成图表
 def generate_chart_html(top20, chart_type):
-    if not top20: return "<div style='text-align:center;padding:50px;color:#666;'>暂无有效数据</div>"
+    if not top20:
+        return "<div style='text-align:center;padding:50px;color:#666;'>暂无有效数据</div>"
+    
     words, freqs = [i[0] for i in top20], [i[1] for i in top20]
     max_freq = max(freqs) if freqs else 1
-    
-    if chart_type == "词云图":
-        c = WordCloud(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500")).add("词频", top20, word_size_range=[20,80]).set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇词云图"))
-    elif chart_type == "柱状图":
-        c = WordCloud(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500")).add("词频", top20, word_size_range=[20,80]).set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇词云图"))
-        c = Bar(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500")).add_xaxis(words).add_yaxis("词频", freqs).reversal_axis().set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇柱状图"))
-    elif chart_type == "折线图":
-        c = Line(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500")).add_xaxis(words).add_yaxis("词频", freqs).set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇折线图"))
-    elif chart_type == "饼图":
-        c = Pie(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500")).add("", list(zip(words,freqs)), radius=["30%","70%"]).set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇饼图"))
-    elif chart_type == "雷达图":
-        c = Radar(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500")).add_schema(schema=[{"name":w,"max":max_freq} for w in words[:8]]).add("词频", [freqs[:8]]).set_global_opts(title_opts=opts.TitleOpts(title="TOP8词汇雷达图"))
-    elif chart_type == "散点图":
-        c = Scatter(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500")).add_xaxis(words).add_yaxis("词频", freqs, symbol_size=lambda x:x*5).set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇散点图"), visualmap_opts=opts.VisualMapOpts(max_=max_freq))
-    elif chart_type == "热力图":
-        c = HeatMap(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500")).add_xaxis(words).add_yaxis("词频", ["频次"], [[i,0,v] for i,v in enumerate(freqs)]).set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇热力图"), visualmap_opts=opts.VisualMapOpts(max_=max_freq))
-    elif chart_type == "漏斗图":
-        c = Funnel(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500")).add("词频", top20).set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇漏斗图"))
-    return c.render_embed()
 
+    # 生成图表（改用render_notebook，适配Streamlit）
+    if chart_type == "词云图":
+        c = WordCloud(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
+        c.add("词频", top20, word_size_range=[20, 80])
+        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇词云图"))
+    elif chart_type == "柱状图":
+        c = Bar(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
+        c.add_xaxis(words)
+        c.add_yaxis("词频", freqs)
+        c.reversal_axis()
+        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇柱状图"))
+    elif chart_type == "折线图":
+        c = Line(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
+        c.add_xaxis(words)
+        c.add_yaxis("词频", freqs)
+        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇折线图"))
+    elif chart_type == "饼图":
+        c = Pie(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
+        c.add("", list(zip(words, freqs)), radius=["30%", "70%"])
+        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇饼图"))
+    elif chart_type == "雷达图":
+        c = Radar(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
+        c.add_schema(schema=[{"name": w, "max": max_freq} for w in words[:8]])
+        c.add("词频", [freqs[:8]])
+        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP8词汇雷达图"))
+    elif chart_type == "散点图":
+        c = Scatter(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
+        c.add_xaxis(words)
+        c.add_yaxis("词频", freqs, symbol_size=lambda x: x*5)
+        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇散点图"), visualmap_opts=opts.VisualMapOpts(max_=max_freq))
+    elif chart_type == "热力图":
+        c = HeatMap(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
+        c.add_xaxis(words)
+        c.add_yaxis("词频", ["频次"], [[i, 0, v] for i, v in enumerate(freqs)])
+        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇热力图"), visualmap_opts=opts.VisualMapOpts(max_=max_freq))
+    elif chart_type == "漏斗图":
+        c = Funnel(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
+        c.add("词频", top20)
+        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇漏斗图"))
+
+    # 生成适合Streamlit的HTML（关键修复）
+    return c.render_notebook()
 # ======== Streamlit页面布局 ========
 st.title("📊 URL文本词频分析系统")
 st.subheader("Streamlit Cloud部署版 | 支持8种图表可视化")
@@ -122,3 +147,4 @@ if analyze_btn:
 st.divider()
 
 st.caption("💡 部署于Streamlit Cloud | 支持32位系统兼容")
+
