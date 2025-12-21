@@ -141,10 +141,11 @@ if analyze_btn:
             # 展示图表
             st.subheader(f"📈 {chart_type}可视化")
             chart_html = generate_chart_html(top20, chart_type)
-            html(chart_html, width=850, height=550)
+            st.components.v1.html(chart_html, width=850, height=550)
 
 # 页脚
 st.divider()
 
 st.caption("💡 部署于Streamlit Cloud | 支持32位系统兼容")
+
 
