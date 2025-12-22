@@ -6,17 +6,15 @@ from collections import Counter
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+from wordcloud import WordCloud
 import matplotlib.pyplot as plt
-import numpy as np
 import os
 
-# 页面配置 + 直接指定字体路径（核心修复：避开font_manager）
+# 页面配置
 st.set_page_config(page_title="URL词频分析系统", page_icon="📊", layout="wide")
-# 直接用字体路径配置matplotlib
-plt.rcParams['font.sans-serif'] = ['SimHei']  # 字体名
-plt.rcParams['font.family'] = 'sans-serif'
-plt.rcParams['axes.unicode_minus'] = False
-plt.rcParams['figure.dpi'] = 100
+
+# 加载中文字体（解决词云中文显示）
+font_path = os.path.join(os.path.dirname(__file__), 'SimHei.ttf')
 
 # 兜底文本
 BACKUP_TEXT = """人工智能是一门旨在使计算机系统能够模拟、延伸和扩展人类智能的技术科学。它涵盖了机器学习、自然语言处理、计算机视觉、专家系统等多个领域。机器学习是人工智能的核心，通过让计算机从数据中学习模式，而无需显式编程。深度学习作为机器学习的一个分支，使用神经网络模拟人脑结构，在图像识别、语音识别等领域取得了突破性进展。自然语言处理则专注于让计算机理解和生成人类语言，如聊天机器人、机器翻译等应用。人工智能的发展已经深刻影响了医疗、金融、交通、教育等各行各业，未来还将继续推动社会的数字化转型。"""
@@ -42,37 +40,41 @@ def analyze_text(text, min_freq=1):
     word_freq = Counter(words)
     return {k:v for k,v in word_freq.items() if v>=min_freq}, sorted(word_freq.items(), key=lambda x:x[1], reverse=True)[:20]
 
-# 3. 简化版图表生成（避免复杂依赖）
+# 3. 8种图表（含标准词云图）
 def show_chart(top20, chart_type):
     if not top20:
         st.warning("暂无有效数据")
         return
     df = pd.DataFrame(top20, columns=["词汇", "词频"])
-    colors = ['#4285F4']
+    word_freq_dict = dict(top20)
 
-    # 1. 词云图（简化版）
+    # 1. 标准词云图
     if chart_type == "词云图":
+        wc = WordCloud(
+            font_path=font_path,
+            width=800, height=500,
+            background_color="white",
+            max_words=20
+        ).generate_from_frequencies(word_freq_dict)
         fig, ax = plt.subplots(figsize=(10,6))
-        ax.barh(df["词汇"], df["词频"], color=colors[0])
-        ax.set_xlabel("词频")
-        ax.set_ylabel("词汇")
-        ax.set_title("TOP20词汇词云图（简化）")
+        ax.imshow(wc)
+        ax.axis("off")
+        ax.set_title("TOP20词汇词云图")
         st.pyplot(fig)
     
     # 2. 柱状图
     elif chart_type == "柱状图":
         fig, ax = plt.subplots(figsize=(10,6))
-        ax.bar(df["词汇"], df["词频"], color=colors[0])
-        plt.xticks(rotation=45)
-        ax.set_xlabel("词汇")
-        ax.set_ylabel("词频")
+        ax.barh(df["词汇"], df["词频"], color="#4285F4")
+        ax.set_xlabel("词频")
+        ax.set_ylabel("词汇")
         ax.set_title("TOP20词汇柱状图")
         st.pyplot(fig)
     
     # 3. 折线图
     elif chart_type == "折线图":
         fig, ax = plt.subplots(figsize=(10,6))
-        ax.plot(df["词汇"], df["词频"], marker='o', color=colors[0])
+        ax.plot(df["词汇"], df["词频"], marker='o', color="#4285F4")
         plt.xticks(rotation=45)
         ax.set_xlabel("词汇")
         ax.set_ylabel("词频")
@@ -89,13 +91,11 @@ def show_chart(top20, chart_type):
     # 5. 雷达图
     elif chart_type == "雷达图":
         fig, ax = plt.subplots(figsize=(8,8), subplot_kw=dict(polar=True))
-        theta = np.linspace(0, 2*np.pi, len(df), endpoint=False)
-        values = df["词频"].values
-        theta = np.concatenate((theta, [theta[0]]))
-        values = np.concatenate((values, [values[0]]))
-        ax.plot(theta, values, color=colors[0])
+        theta = list(range(len(df))) + [0]
+        values = df["词频"].tolist() + [df["词频"].tolist()[0]]
+        ax.plot(theta, values, color="#4285F4")
         ax.fill(theta, values, alpha=0.2)
-        ax.set_xticks(theta[:-1])
+        ax.set_xticks(range(len(df)))
         ax.set_xticklabels(df["词汇"])
         ax.set_title("TOP20词汇雷达图")
         st.pyplot(fig)
@@ -103,7 +103,7 @@ def show_chart(top20, chart_type):
     # 6. 散点图
     elif chart_type == "散点图":
         fig, ax = plt.subplots(figsize=(10,6))
-        ax.scatter(df["词汇"], df["词频"], s=df["词频"]*50, color=colors[0])
+        ax.scatter(df["词汇"], df["词频"], s=df["词频"]*50, color="#4285F4")
         plt.xticks(rotation=45)
         ax.set_xlabel("词汇")
         ax.set_ylabel("词频")
@@ -127,7 +127,7 @@ def show_chart(top20, chart_type):
         fig, ax = plt.subplots(figsize=(10,6))
         widths = df["词频"]/df["词频"].max()*0.8
         for i, (word, freq, w) in enumerate(zip(df["词汇"], df["词频"], widths)):
-            ax.bar(i, freq, width=w, color=colors[0], alpha=0.7)
+            ax.bar(i, freq, width=w, color="#4285F4", alpha=0.7)
             ax.text(i, freq+0.5, word, ha='center')
         ax.set_xticks([])
         ax.set_title("TOP20词汇漏斗图")
@@ -135,7 +135,7 @@ def show_chart(top20, chart_type):
 
 # 页面布局
 st.title("📊 URL文本词频分析系统")
-st.subheader("Streamlit Cloud部署版")
+st.subheader("Streamlit Cloud部署版 | 标准词云图+中文显示")
 
 with st.sidebar:
     st.header("⚙️ 配置项")
