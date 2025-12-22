@@ -6,3 +6,4 @@ urllib3==1.26.16
 pandas>=2.2.0
 matplotlib>=3.8.0
 numpy>=1.26.0
+wordcloud>=1.9.3  # 新增：解决WordCloud导入失败
