@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
-# streamlit_text_analysis.py (核心文件)
 import streamlit as st
 import jieba
 import re
-import tempfile
-import os
 from collections import Counter
-import pyecharts.options as opts
-from pyecharts.charts import WordCloud, Bar, Line, Pie, Radar, Scatter, HeatMap, Funnel
-from pyecharts.globals import ThemeType
 import requests
 from bs4 import BeautifulSoup
-from streamlit.components.v1 import html
+import pandas as pd
+import matplotlib.pyplot as plt
+# 解决matplotlib中文显示问题
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans']  # 云端兼容字体
+plt.rcParams['axes.unicode_minus'] = False
 
 # 页面配置
 st.set_page_config(
@@ -44,65 +42,104 @@ def analyze_text(text, min_freq=1):
     word_freq = Counter(words)
     return {k:v for k,v in word_freq.items() if v>=min_freq}, sorted(word_freq.items(), key=lambda x:x[1], reverse=True)[:20]
 
-# 3. 生成图表
-
-def generate_chart_html(top20, chart_type):
+# 3. Streamlit原生图表生成（核心修复）
+def show_chart(top20, chart_type):
     if not top20:
-        return "<div style='text-align:center;padding:50px;color:#666;'>暂无有效数据</div>"
+        st.warning("暂无有效数据可展示")
+        return
     
-    words, freqs = [i[0] for i in top20], [i[1] for i in top20]
-    max_freq = max(freqs) if freqs else 1
-
-    # 生成图表
+    # 转换为DataFrame
+    df = pd.DataFrame(top20, columns=["词汇", "词频"])
+    
+    # 1. 词云图（用matplotlib模拟）
     if chart_type == "词云图":
-        c = WordCloud(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
-        c.add("词频", top20, word_size_range=[20, 80])
-        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇词云图"))
+        fig, ax = plt.subplots(figsize=(10, 6))
+        y_pos = range(len(df))
+        ax.barh(y_pos, df["词频"], color='#4285F4')
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(df["词汇"])
+        ax.set_xlabel("词频")
+        ax.set_title("TOP20词汇词频分布（替代词云）")
+        st.pyplot(fig)
+    
+    # 2. 柱状图
     elif chart_type == "柱状图":
-        c = Bar(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
-        c.add_xaxis(words)
-        c.add_yaxis("词频", freqs)
-        c.reversal_axis()
-        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇柱状图"))
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.barh(df["词汇"], df["词频"], color='#4285F4')
+        ax.set_xlabel("词频")
+        ax.set_ylabel("词汇")
+        ax.set_title("TOP20词汇柱状图")
+        st.pyplot(fig)
+    
+    # 3. 折线图
     elif chart_type == "折线图":
-        c = Line(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
-        c.add_xaxis(words)
-        c.add_yaxis("词频", freqs)
-        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇折线图"))
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.plot(df["词汇"], df["词频"], marker='o', color='#4285F4')
+        ax.set_xlabel("词汇")
+        ax.set_ylabel("词频")
+        ax.set_title("TOP20词汇折线图")
+        plt.xticks(rotation=45)
+        st.pyplot(fig)
+    
+    # 4. 饼图
     elif chart_type == "饼图":
-        c = Pie(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
-        c.add("", list(zip(words, freqs)), radius=["30%", "70%"])
-        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇饼图"))
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.pie(df["词频"], labels=df["词汇"], autopct='%1.1f%%')
+        ax.set_title("TOP20词汇饼图")
+        st.pyplot(fig)
+    
+    # 5. 雷达图（取前8个）
     elif chart_type == "雷达图":
-        c = Radar(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
-        c.add_schema(schema=[{"name": w, "max": max_freq} for w in words[:8]])
-        c.add("词频", [freqs[:8]])
-        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP8词汇雷达图"))
+        df_radar = df.head(8)
+        fig = plt.figure(figsize=(8, 8))
+        ax = fig.add_subplot(111, polar=True)
+        angles = [n / float(len(df_radar)) * 2 * plt.pi for n in range(len(df_radar))]
+        angles += angles[:1]
+        values = df_radar["词频"].tolist()
+        values += values[:1]
+        ax.plot(angles, values, 'o-', linewidth=2, color='#4285F4')
+        ax.fill(angles, values, alpha=0.25, color='#4285F4')
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(df_radar["词汇"])
+        ax.set_title("TOP8词汇雷达图")
+        st.pyplot(fig)
+    
+    # 6. 散点图
     elif chart_type == "散点图":
-        c = Scatter(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
-        c.add_xaxis(words)
-        c.add_yaxis("词频", freqs, symbol_size=lambda x: x*5)
-        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇散点图"), visualmap_opts=opts.VisualMapOpts(max_=max_freq))
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.scatter(df["词汇"], df["词频"], s=df["词频"]*20, color='#4285F4', alpha=0.7)
+        ax.set_xlabel("词汇")
+        ax.set_ylabel("词频")
+        ax.set_title("TOP20词汇散点图")
+        plt.xticks(rotation=45)
+        st.pyplot(fig)
+    
+    # 7. 热力图（简化版）
     elif chart_type == "热力图":
-        c = HeatMap(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
-        c.add_xaxis(words)
-        c.add_yaxis("词频", ["频次"], [[i, 0, v] for i, v in enumerate(freqs)])
-        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇热力图"), visualmap_opts=opts.VisualMapOpts(max_=max_freq))
+        fig, ax = plt.subplots(figsize=(10, 3))
+        im = ax.imshow(df["词频"].values.reshape(1, -1), cmap='Blues', aspect='auto')
+        ax.set_xticks(range(len(df)))
+        ax.set_xticklabels(df["词汇"])
+        ax.set_yticks([0])
+        ax.set_yticklabels(["词频"])
+        ax.set_title("TOP20词汇热力图")
+        plt.colorbar(im, ax=ax)
+        plt.xticks(rotation=45)
+        st.pyplot(fig)
+    
+    # 8. 漏斗图（简化版）
     elif chart_type == "漏斗图":
-        c = Funnel(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="800", height="500"))
-        c.add("词频", top20)
-        c.set_global_opts(title_opts=opts.TitleOpts(title="TOP20词汇漏斗图"))
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.bar(df["词汇"], df["词频"], color='#4285F4')
+        ax.set_xlabel("词汇")
+        ax.set_ylabel("词频")
+        ax.set_title("TOP20词汇漏斗图（简化版）")
+        plt.xticks(rotation=45)
+        st.pyplot(fig)
 
-    # 临时生成HTML文件并读取内容（关键修复）
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False, encoding="utf-8") as f:
-        c.render(f.name)
-        with open(f.name, "r", encoding="utf-8") as f_read:
-            html_content = f_read.read()
-    os.unlink(f.name)  # 删除临时文件
-    return html_content
 # ======== Streamlit页面布局 ========
 st.title("📊 URL文本词频分析系统")
-st.subheader("Streamlit Cloud部署版 | 支持8种图表可视化")
+st.subheader("Streamlit Cloud部署版 | 原生图表100%显示")
 
 # 输入区域
 with st.sidebar:
@@ -146,15 +183,10 @@ if analyze_btn:
             st.subheader("📋 TOP20词汇列表")
             st.table([{"排名":i+1, "词汇":w, "词频":f} for i,(w,f) in enumerate(top20)])
             
-            # 展示图表
+            # 展示图表（核心修复）
             st.subheader(f"📈 {chart_type}可视化")
-            chart_html = generate_chart_html(top20, chart_type)
-            st.components.v1.html(chart_html, width=850, height=550)
+            show_chart(top20, chart_type)
 
 # 页脚
 st.divider()
-
-st.caption("💡 部署于Streamlit Cloud | 支持32位系统兼容")
-
-
-
+st.caption("💡 部署于Streamlit Cloud | 原生matplotlib图表100%兼容")
