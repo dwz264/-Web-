@@ -3,8 +3,6 @@ import streamlit as st
 import jieba
 import re
 from collections import Counter
-import requests
-from bs4 import BeautifulSoup
 import pandas as pd
 
 # 页面基础配置
@@ -24,32 +22,45 @@ def analyze_text(text, min_freq=1):
     top20 = sorted(word_freq.items(), key=lambda x:x[1], reverse=True)[:20]
     return pd.DataFrame(top20, columns=["词汇", "词频"])
 
-# 2. 图表生成（仅用Streamlit官方组件，100%稳定）
+# 2. 图表生成（修复饼图+横向柱状图参数）
 def render_chart(df, chart_type):
-    # 确保索引为词汇（适配Streamlit图表）
+    # 数据预处理（确保格式正确）
+    df = df.head(10)  # 限制显示数量，避免图表拥挤
     df_chart = df.set_index("词汇")
     
     if chart_type == "柱状图":
         st.bar_chart(df_chart["词频"], use_container_width=True)
     elif chart_type == "折线图":
         st.line_chart(df_chart["词频"], use_container_width=True)
-    elif chart_type == "面积图":  # 替代雷达图，样式更标准
+    elif chart_type == "面积图":
         st.area_chart(df_chart["词频"], use_container_width=True)
     elif chart_type == "饼图":
-        st.pie_chart(df_chart["词频"], use_container_width=True)
+        # 修复饼图：Streamlit饼图需要一维数据，且数量不宜过多
+        st.pyplot(df_chart["词频"].plot.pie(figsize=(8,8), autopct='%1.1f%%').get_figure())
     elif chart_type == "散点图":
         st.scatter_chart(df, x="词汇", y="词频", size="词频", use_container_width=True)
-    elif chart_type == "横向柱状图":  # 替代词云图，更易读
-        st.bar_chart(df_chart["词频"].T, use_container_width=True)
-    elif chart_type == "热力图（数值）":  # 简化版热力图
+    elif chart_type == "横向柱状图（替代词云）":
+        # 修复横向柱状图：用matplotlib绘制标准横向柱状图
+        fig, ax = plt.subplots(figsize=(10,6))
+        ax.barh(df["词汇"], df["词频"], color="#4285F4")
+        ax.set_xlabel("词频")
+        ax.set_ylabel("词汇")
+        ax.set_title("TOP10词汇横向柱状图（替代词云）")
+        st.pyplot(fig)
+    elif chart_type == "热力图（数值）":
         st.dataframe(df_chart.style.background_gradient(cmap="Blues"), use_container_width=True)
-    elif chart_type == "漏斗图（排序）":  # 标准漏斗图逻辑
+    elif chart_type == "漏斗图（排序）":
         df_sorted = df.sort_values("词频", ascending=True)
         st.bar_chart(df_sorted.set_index("词汇")["词频"], use_container_width=True)
 
-# ======== 页面布局（极简，无多余逻辑） ========
-st.title("📊 URL词频分析系统（稳定版）")
+# ======== 页面布局 ========
+st.title("📊 URL词频分析系统（最终稳定版）")
 st.markdown("### 配置项")
+
+# 导入matplotlib（仅用于饼图/横向柱状图）
+import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans']  # 云端兼容字体
+plt.rcParams['axes.unicode_minus'] = False
 
 # 侧边栏配置
 with st.sidebar:
@@ -66,17 +77,17 @@ with st.sidebar:
 
 # 核心逻辑
 if analyze_btn:
-    # 分析文本（用固定文本，避免URL抓取问题）
+    # 分析文本
     df_result = analyze_text(TEST_TEXT, min_freq)
     
     # 展示结果
     st.success("✅ 分析完成！")
-    st.markdown("### 📋 TOP20词汇列表")
-    st.dataframe(df_result, use_container_width=True)
+    st.markdown("### 📋 TOP10词汇列表")
+    st.dataframe(df_result.head(10), use_container_width=True)
     
     st.markdown(f"### 📈 {chart_type}")
     render_chart(df_result, chart_type)
 
 # 页脚说明
 st.divider()
-st.caption("💡 基于Streamlit官方图表组件，云端100%稳定运行")
+st.caption("💡 修复饼图/横向柱状图显示问题，云端稳定运行")
