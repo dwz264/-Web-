@@ -6,15 +6,9 @@ from collections import Counter
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-from wordcloud import WordCloud
-import matplotlib.pyplot as plt
-import os
 
 # 页面配置
 st.set_page_config(page_title="URL词频分析系统", page_icon="📊", layout="wide")
-
-# 加载中文字体（解决词云中文显示）
-font_path = os.path.join(os.path.dirname(__file__), 'SimHei.ttf')
 
 # 兜底文本
 BACKUP_TEXT = """人工智能是一门旨在使计算机系统能够模拟、延伸和扩展人类智能的技术科学。它涵盖了机器学习、自然语言处理、计算机视觉、专家系统等多个领域。机器学习是人工智能的核心，通过让计算机从数据中学习模式，而无需显式编程。深度学习作为机器学习的一个分支，使用神经网络模拟人脑结构，在图像识别、语音识别等领域取得了突破性进展。自然语言处理则专注于让计算机理解和生成人类语言，如聊天机器人、机器翻译等应用。人工智能的发展已经深刻影响了医疗、金融、交通、教育等各行各业，未来还将继续推动社会的数字化转型。"""
@@ -40,102 +34,77 @@ def analyze_text(text, min_freq=1):
     word_freq = Counter(words)
     return {k:v for k,v in word_freq.items() if v>=min_freq}, sorted(word_freq.items(), key=lambda x:x[1], reverse=True)[:20]
 
-# 3. 8种图表（含标准词云图）
+# 3. 纯Streamlit原生图表（8种，无任何第三方库）
 def show_chart(top20, chart_type):
     if not top20:
         st.warning("暂无有效数据")
         return
     df = pd.DataFrame(top20, columns=["词汇", "词频"])
-    word_freq_dict = dict(top20)
 
-    # 1. 标准词云图
+    # 1. 词云图（原生组件版）
     if chart_type == "词云图":
-        wc = WordCloud(
-            font_path=font_path,
-            width=800, height=500,
-            background_color="white",
-            max_words=20
-        ).generate_from_frequencies(word_freq_dict)
-        fig, ax = plt.subplots(figsize=(10,6))
-        ax.imshow(wc)
-        ax.axis("off")
-        ax.set_title("TOP20词汇词云图")
-        st.pyplot(fig)
-    
-    # 2. 柱状图
+        st.subheader("TOP20词汇词云图")
+        cols = st.columns(5)
+        for idx, (word, freq) in enumerate(top20):
+            col = cols[idx % 5]
+            if freq >= 8:
+                col.title(word)
+            elif freq >= 5:
+                col.header(word)
+            else:
+                col.subheader(word)
+
+    # 2. 柱状图（原生表格+进度条）
     elif chart_type == "柱状图":
-        fig, ax = plt.subplots(figsize=(10,6))
-        ax.barh(df["词汇"], df["词频"], color="#4285F4")
-        ax.set_xlabel("词频")
-        ax.set_ylabel("词汇")
-        ax.set_title("TOP20词汇柱状图")
-        st.pyplot(fig)
-    
-    # 3. 折线图
+        st.subheader("TOP20词汇柱状图")
+        for word, freq in top20:
+            st.write(f"**{word}**")
+            st.progress(freq / df["词频"].max())
+
+    # 3. 折线图（原生折线组件）
     elif chart_type == "折线图":
-        fig, ax = plt.subplots(figsize=(10,6))
-        ax.plot(df["词汇"], df["词频"], marker='o', color="#4285F4")
-        plt.xticks(rotation=45)
-        ax.set_xlabel("词汇")
-        ax.set_ylabel("词频")
-        ax.set_title("TOP20词汇折线图")
-        st.pyplot(fig)
-    
-    # 4. 饼图
+        st.subheader("TOP20词汇折线图")
+        st.line_chart(df.set_index("词汇")["词频"])
+
+    # 4. 饼图（原生饼图组件）
     elif chart_type == "饼图":
-        fig, ax = plt.subplots(figsize=(8,8))
-        ax.pie(df["词频"], labels=df["词汇"], autopct='%1.1f%%')
-        ax.set_title("TOP20词汇饼图")
-        st.pyplot(fig)
-    
-    # 5. 雷达图
+        st.subheader("TOP20词汇饼图")
+        st.pie_chart(df.set_index("词汇")["词频"])
+
+    # 5. 雷达图（原生指标+分栏）
     elif chart_type == "雷达图":
-        fig, ax = plt.subplots(figsize=(8,8), subplot_kw=dict(polar=True))
-        theta = list(range(len(df))) + [0]
-        values = df["词频"].tolist() + [df["词频"].tolist()[0]]
-        ax.plot(theta, values, color="#4285F4")
-        ax.fill(theta, values, alpha=0.2)
-        ax.set_xticks(range(len(df)))
-        ax.set_xticklabels(df["词汇"])
-        ax.set_title("TOP20词汇雷达图")
-        st.pyplot(fig)
-    
-    # 6. 散点图
+        st.subheader("TOP8词汇雷达图")
+        df_radar = df.head(8)
+        cols = st.columns(4)
+        for idx, (word, freq) in df_radar.iterrows():
+            col = cols[idx % 4]
+            col.metric(label=word, value=freq)
+
+    # 6. 散点图（原生散点组件）
     elif chart_type == "散点图":
-        fig, ax = plt.subplots(figsize=(10,6))
-        ax.scatter(df["词汇"], df["词频"], s=df["词频"]*50, color="#4285F4")
-        plt.xticks(rotation=45)
-        ax.set_xlabel("词汇")
-        ax.set_ylabel("词频")
-        ax.set_title("TOP20词汇散点图")
-        st.pyplot(fig)
-    
-    # 7. 热力图
+        st.subheader("TOP20词汇散点图")
+        st.scatter_chart(df, x="词汇", y="词频", size="词频")
+
+    # 7. 热力图（原生颜色块）
     elif chart_type == "热力图":
-        fig, ax = plt.subplots(figsize=(10,3))
-        im = ax.imshow(df["词频"].values.reshape(1,-1), cmap='Blues')
-        ax.set_xticks(range(len(df)))
-        ax.set_xticklabels(df["词汇"], rotation=45)
-        ax.set_yticks([0])
-        ax.set_yticklabels(["词频"])
-        plt.colorbar(im)
-        ax.set_title("TOP20词汇热力图")
-        st.pyplot(fig)
-    
-    # 8. 漏斗图
+        st.subheader("TOP20词汇热力图")
+        cols = st.columns(len(df))
+        for idx, (word, freq) in enumerate(top20):
+            col = cols[idx]
+            col.write(word)
+            col.markdown(f"<div style='background:#{int(255-freq*10):02x}e6f9; height:30px;'></div>", unsafe_allow_html=True)
+
+    # 8. 漏斗图（原生分栏+高度渐变）
     elif chart_type == "漏斗图":
-        fig, ax = plt.subplots(figsize=(10,6))
-        widths = df["词频"]/df["词频"].max()*0.8
-        for i, (word, freq, w) in enumerate(zip(df["词汇"], df["词频"], widths)):
-            ax.bar(i, freq, width=w, color="#4285F4", alpha=0.7)
-            ax.text(i, freq+0.5, word, ha='center')
-        ax.set_xticks([])
-        ax.set_title("TOP20词汇漏斗图")
-        st.pyplot(fig)
+        st.subheader("TOP20词汇漏斗图")
+        max_freq = df["词频"].max()
+        for word, freq in top20:
+            height = int(freq / max_freq * 50)
+            st.markdown(f"<div style='background:#4285F4; height:{height}px; text-align:center; color:white; line-height:{height}px;'>{word} ({freq})</div>", unsafe_allow_html=True)
 
 # 页面布局
 st.title("📊 URL文本词频分析系统")
-st.subheader("Streamlit Cloud部署版 | 标准词云图+中文显示")
+st.subheader("Streamlit原生版 | 无第三方依赖")
 
 with st.sidebar:
     st.header("⚙️ 配置项")
@@ -147,18 +116,18 @@ with st.sidebar:
 # 分析逻辑
 if analyze_btn:
     if not url:
-        st.error("请输入URL")
+        st.error("请输入有效的URL！")
     else:
         text = fetch_url_text(url)
         if text.startswith("URL抓取失败"):
             st.error(text)
-        elif len(text)<50:
-            st.warning("使用兜底文本")
+        elif len(text) < 50:
+            st.warning("URL文本过短，使用兜底测试文本！")
             text = BACKUP_TEXT
         
         word_freq, top20 = analyze_text(text, min_freq)
         if not top20:
-            st.error("无有效词汇")
+            st.error("无有效词汇，降低词频重试！")
         else:
             st.success(f"分析成功！有效词汇{len(word_freq)}个")
             st.table([{"排名":i+1, "词汇":w, "词频":f} for i,(w,f) in enumerate(top20)])
