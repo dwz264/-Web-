@@ -122,8 +122,8 @@ if analyze_btn:
                 st.info("爬取失败，自动使用测试文本进行分析")
         
         df_result = analyze_text(target_text, min_freq)
-         st.markdown("### 📋 TOP10词汇原始列表")
         st.success("✅ 分析完成！")
+        st.markdown("### 📋 TOP10词汇原始列表")
         st.dataframe(df_result[["词汇", "词频"]], use_container_width=True)
         st.markdown(f"### 📈 {chart_type}")
         render_chart(df_result, chart_type)
@@ -131,6 +131,7 @@ if analyze_btn:
 # 页脚说明
 st.divider()
 st.caption("💡 图表内用编号保证样式，下方标注中文词汇，兼顾可视化效果与可读性")
+
 
 
 
