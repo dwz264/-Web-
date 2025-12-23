@@ -1,16 +1,45 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 import jieba
+import requests
+from bs4 import BeautifulSoup
 from collections import Counter
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import re
 
 # 页面基础配置
 st.set_page_config(page_title="URL词频分析系统", page_icon="📊", layout="wide")
 
-# 固定测试文本
+# 固定测试文本（爬取失败时兜底）
 TEST_TEXT = """人工智能是一门旨在使计算机系统能够模拟、延伸和扩展人类智能的技术科学。它涵盖了机器学习、自然语言处理、计算机视觉、专家系统等多个领域。机器学习是人工智能的核心，通过让计算机从数据中学习模式，而无需显式编程。深度学习作为机器学习的一个分支，使用神经网络模拟人脑结构，在图像识别、语音识别等领域取得了突破性进展。自然语言处理则专注于让计算机理解和生成人类语言，如聊天机器人、机器翻译等应用。人工智能的发展已经深刻影响了医疗、金融、交通、教育等各行各业，未来还将继续推动社会的数字化转型。"""
+
+# 新增：URL爬取函数
+def crawl_url_text(url):
+    """爬取指定URL的中文文本内容"""
+    try:
+        # 模拟浏览器请求头，避免反爬
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        # 发送请求（超时15秒，关闭SSL验证）
+        resp = requests.get(url, headers=headers, timeout=15, verify=False)
+        resp.encoding = resp.apparent_encoding or "utf-8"  # 自动识别编码
+        
+        # 解析HTML，提取主要文本
+        soup = BeautifulSoup(resp.text, "html.parser")
+        # 优先提取p标签和article标签的文本（文章核心内容）
+        p_text = "\n".join([p.get_text(strip=True) for p in soup.find_all("p") if len(p.get_text(strip=True))>5])
+        art_text = soup.find("article").get_text(strip=True) if soup.find("article") else ""
+        raw_text = p_text if len(p_text) > len(art_text) else art_text
+        
+        # 清洗文本：只保留中文
+        clean_text = re.sub(r"[^\u4e00-\u9fa5\s]", "", re.sub(r"\s+", " ", raw_text))
+        return clean_text if len(clean_text) > 50 else None
+    except Exception as e:
+        st.error(f"URL爬取失败：{str(e)}")
+        return None
 
 # 1. 文本分析（生成带编号的词汇表）
 def analyze_text(text, min_freq=1):
@@ -71,10 +100,18 @@ def render_chart(df, chart_type):
     label_df = df[["编号", "词汇", "词频"]].set_index("编号")
     st.dataframe(label_df, use_container_width=True)
 
-# ======== 页面布局 ========
+# ======== 页面布局（新增URL搜索框） ========
 st.title("📊 URL词频分析系统（最终稳定版）")
-st.markdown("### 配置项")
+st.markdown("### 网址爬取配置")
 
+# 新增：URL输入搜索框
+url_input = st.text_input(
+    label="输入需要爬取的网站URL",
+    placeholder="示例：https://www.guokr.com/article/440923/",
+    help="请输入公开的中文文章类URL（如新闻、博客、公众号文章）"
+)
+
+st.markdown("### 分析配置项")
 # 侧边栏配置
 with st.sidebar:
     min_freq = st.slider("最低词频过滤", 1, 5, 1)
@@ -86,21 +123,32 @@ with st.sidebar:
             "热力图（数值）", "漏斗图（排序）"
         ]
     )
-    analyze_btn = st.button("🔍 开始分析", type="primary")
+    analyze_btn = st.button("🔍 开始爬取并分析", type="primary")
 
-# 核心逻辑
+# 核心逻辑（修改：支持URL爬取）
 if analyze_btn:
-    # 分析文本
-    df_result = analyze_text(TEST_TEXT, min_freq)
-    
-    # 展示结果
-    st.success("✅ 分析完成！")
-    st.markdown("### 📋 TOP10词汇原始列表")
-    st.dataframe(df_result[["词汇", "词频"]], use_container_width=True)
-    
-    # 渲染图表+中文标注
-    st.markdown(f"### 📈 {chart_type}")
-    render_chart(df_result, chart_type)
+    if not url_input:
+        st.warning("请先输入需要爬取的URL地址！")
+    else:
+        with st.spinner("正在爬取网页文本..."):
+            # 爬取URL文本
+            crawled_text = crawl_url_text(url_input)
+            # 爬取失败则使用原有测试文本
+            target_text = crawled_text if crawled_text else TEST_TEXT
+            if not crawled_text:
+                st.info("爬取失败，自动使用测试文本进行分析")
+        
+        # 分析文本
+        df_result = analyze_text(target_text, min_freq)
+        
+        # 展示结果
+        st.success("✅ 分析完成！")
+        st.markdown("### 📋 TOP10词汇原始列表")
+        st.dataframe(df_result[["词汇", "词频"]], use_container_width=True)
+        
+        # 渲染图表+中文标注
+        st.markdown(f"### 📈 {chart_type}")
+        render_chart(df_result, chart_type)
 
 # 页脚说明
 st.divider()
