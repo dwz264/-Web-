@@ -64,7 +64,7 @@ def render_chart(df, chart_type):
             autopct='%1.1f%%',
             colors=plt.cm.Set3(np.linspace(0, 1, len(df)))
         )
-        ax.set_title("TOP10词汇饼图（编号对应下方中文）")  # 去掉多余方框
+        ax.set_title("TOP10")  # 去掉多余方框
         st.pyplot(fig)
     elif chart_type == "散点图":
         st.scatter_chart(df, x="编号", y="词频", size="词频", use_container_width=True)
@@ -73,7 +73,7 @@ def render_chart(df, chart_type):
         ax.barh(df["编号"], df["词频"], color="#4285F4")
         ax.set_xlabel("词频")
         ax.set_ylabel("词汇编号")
-        ax.set_title("TOP10词汇横向柱状图（替代词云）")  # 去掉多余方框
+        ax.set_title("TOP10")  # 去掉多余方框
         st.pyplot(fig)
     elif chart_type == "热力图（数值）":
         st.dataframe(df_chart[["词频"]].style.background_gradient(cmap="Blues"), use_container_width=True)
@@ -122,6 +122,7 @@ if analyze_btn:
                 st.info("爬取失败，自动使用测试文本进行分析")
         
         df_result = analyze_text(target_text, min_freq)
+         st.markdown("### 📋 TOP10词汇原始列表")
         st.success("✅ 分析完成！")
         st.dataframe(df_result[["词汇", "词频"]], use_container_width=True)
         st.markdown(f"### 📈 {chart_type}")
@@ -130,6 +131,7 @@ if analyze_btn:
 # 页脚说明
 st.divider()
 st.caption("💡 图表内用编号保证样式，下方标注中文词汇，兼顾可视化效果与可读性")
+
 
 
 
